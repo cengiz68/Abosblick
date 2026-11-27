@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vertragsfrist
 
-## Getting Started
+Web-App (Schweiz, CHF) zum Verwalten von Verträgen: Kündigungsfristen automatisch berechnen, Ampel-Dashboard mit
+Monats-/Jahreskosten, Kündigungsschreiben als PDF mit einem Klick, KI-Scan von Rechnungen/Policen, E-Mail-Erinnerungen
+und Freemium-Modell (Free: 3 Verträge, Pro: CHF 4.90/Mt. oder CHF 39/Jahr).
 
-First, run the development server:
+**Stack:** Next.js 15 (App Router, Server Actions) · Prisma + SQLite · Auth.js (E-Mail/Passwort) · pdf-lib ·
+Claude API (Vision/PDF) · nodemailer · Stripe · Tailwind · Vitest
+
+## Setup
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env        # AUTH_SECRET setzen: npx auth secret
+npx prisma migrate dev
+npm run dev                 # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Ohne Stripe-Keys gibt es im Entwicklungsmodus auf `/pricing` den Button „Pro testen“, um Pro-Features lokal freizuschalten.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Umgebungsvariablen
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Zweck |
+|---|---|
+| `DATABASE_URL` | SQLite-Datei (für Produktion `provider = "postgresql"` im Schema setzen) |
+| `AUTH_SECRET` | Signatur der Session-JWTs |
+| `APP_URL` | Basis-URL für Links in E-Mails und Stripe-Redirects |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | KI-Scan (Phase 2). Ohne Key ist der Scan ausgeblendet. Default-Modell `claude-opus-5-5` |
+| `SMTP_URL`, `MAIL_FROM` | E-Mail-Versand. Leer = Mails werden in der Konsole ausgegeben |
+| `CRON_SECRET` | Schützt `/api/cron/reminders` |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY` | Abo-Zahlungen |
 
-## Learn More
+## Fristberechnung (`src/lib/deadlines.ts`)
 
-To learn more about Next.js, take a look at the following resources:
+1. Laufzeitende = Vertragsbeginn + Mindestlaufzeit
+2. Bei automatischer Verlängerung: so lange um die Verlängerungsdauer verschieben, bis die Frist wieder erreichbar ist
+3. Letzter Kündigungstermin = Laufzeitende − Kündigungsfrist (Tage oder Monate)
+4. Erinnerung = letzter Kündigungstermin − Reminder-Tage (Default 30, in den Einstellungen änderbar)
+5. Ampel: rot ≤ 14 Tage, gelb ≤ 60 Tage, sonst grün
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Erinnerungen
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Täglich auslösen – entweder `npm run reminders` (lokal/Cron auf dem Server) oder per HTTP:
 
-## Deploy on Vercel
+```bash
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://deine-app.ch/api/cron/reminders
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`vercel.json` enthält einen täglichen Vercel-Cron. Jede Frist wird pro Vertrag nur einmal gemeldet (`ReminderLog`).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Stripe lokal
+
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+Verarbeitete Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`.
+
+## Tests
+
+```bash
+npm test          # Unit- & Integrationstests (Fristlogik, Plan-Limits, Reminder, Stripe-Webhook, PDF, KI gemockt)
+npm run e2e       # Browser-Smoke-Test gegen laufenden Dev-Server (Playwright muss installiert sein)
+```
+
+## Hinweise
+
+- Hochgeladene Dokumente liegen in `uploads/<userId>/` (nicht öffentlich) und werden zur Auswertung an die Claude API gesendet.
+- Der KI-Scan nutzt Structured Outputs; unsichere Felder werden im Formular gelb markiert und müssen vom Nutzer bestätigt werden.
+- Für Produktion: Postgres statt SQLite, Upload-Speicher auf S3 o. ä., SMTP-Anbieter (z. B. Postmark/Resend) konfigurieren.

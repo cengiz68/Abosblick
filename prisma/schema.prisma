@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String         @id @default(cuid())
+  email                String         @unique
+  passwordHash         String
+  name                 String
+  street               String         @default("")
+  zip                  String         @default("")
+  city                 String         @default("")
+  plan                 String         @default("FREE") // FREE | PRO
+  stripeCustomerId     String?        @unique
+  stripeSubscriptionId String?
+  proUntil             DateTime?
+  reminderDays         Int            @default(30)
+  householdId          String?
+  household            Household?     @relation("Members", fields: [householdId], references: [id])
+  ownedHousehold       Household?     @relation("Owner")
+  contracts            Contract[]
+  files                UploadedFile[]
+  createdAt            DateTime       @default(now())
+}
+
+model Household {
+  id         String   @id @default(cuid())
+  name       String
+  inviteCode String   @unique
+  ownerId    String   @unique
+  owner      User     @relation("Owner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members    User[]   @relation("Members")
+  createdAt  DateTime @default(now())
+}
+
+model Contract {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider        String
+  providerAddress String        @default("")
+  category        String // MOBILE | HEALTH_INSURANCE | FITNESS | SUBSCRIPTION | INSURANCE | ENERGY | INTERNET | OTHER
+  customerNumber  String?
+  contractNumber  String?
+  monthlyPrice    Int // Rappen
+  startDate       DateTime
+  minTermMonths   Int
+  noticeValue     Int
+  noticeUnit      String        @default("MONTHS") // DAYS | MONTHS
+  autoRenew       Boolean       @default(true)
+  renewalMonths   Int           @default(12)
+  status          String        @default("ACTIVE") // ACTIVE | CANCELLED
+  cancelledAt     DateTime?
+  notes           String?
+  sourceFileId    String?
+  reminders       ReminderLog[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+model ReminderLog {
+  id           String   @id @default(cuid())
+  contractId   String
+  contract     Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  deadlineDate DateTime
+  sentAt       DateTime @default(now())
+
+  @@unique([contractId, deadlineDate])
+}
+
+model UploadedFile {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  path          String
+  mimeType      String
+  extractedJson String?
+  createdAt     DateTime @default(now())
+}
