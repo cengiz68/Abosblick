@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import { computeDeadlines, totals } from "@/lib/deadlines";
 
 const d = (s: string) => new Date(`${s}T00:00:00`);
-const iso = (x: Date | null) => (x ? x.toISOString().slice(0, 10) : null);
+const iso = (x: Date) => {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}`;
+};
 const base = {
   startDate: d("2025-01-01"),
   minTermMonths: 24,
@@ -10,71 +13,96 @@ const base = {
   noticeUnit: "MONTHS" as const,
   autoRenew: true,
   renewalMonths: 12,
+  endOfMonth: false,
   status: "ACTIVE" as const,
   monthlyPrice: 2990,
 };
 
 describe("computeDeadlines", () => {
-  it("berechnet Laufzeitende und letzte Kündigungsfrist in der Mindestlaufzeit", () => {
+  it("Vertragsende = letzter Vertragstag, Frist davor", () => {
     const r = computeDeadlines(base, d("2025-06-01"));
-    expect(iso(r.termEnd)).toBe("2027-01-01");
-    expect(iso(r.lastCancellationDate)).toBe("2026-10-01");
-    expect(iso(r.reminderDate)).toBe("2026-09-01");
+    expect(iso(r.termEnd)).toBe("2026-12-31");
+    expect(iso(r.lastCancellationDate)).toBe("2026-09-30");
+    expect(iso(r.reminderDate)).toBe("2026-08-31");
+    expect(iso(r.sendByDate)).toBe("2026-09-23"); // 5 Arbeitstage Puffer für die Post
     expect(r.status).toBe("green");
   });
 
   it("springt bei verpasster Frist in die nächste Verlängerung", () => {
-    const r = computeDeadlines(base, d("2026-10-02"));
-    expect(iso(r.termEnd)).toBe("2028-01-01");
-    expect(iso(r.lastCancellationDate)).toBe("2027-10-01");
+    const r = computeDeadlines(base, d("2026-10-01"));
+    expect(iso(r.termEnd)).toBe("2027-12-31");
+    expect(iso(r.lastCancellationDate)).toBe("2027-09-30");
   });
 
   it("verlängert mehrfach", () => {
     const r = computeDeadlines({ ...base, startDate: d("2015-03-15"), minTermMonths: 12 }, d("2026-11-27"));
-    expect(iso(r.termEnd)).toBe("2027-03-15");
-    expect(iso(r.lastCancellationDate)).toBe("2026-12-15");
-    expect(r.daysUntilDeadline).toBe(18);
+    expect(iso(r.termEnd)).toBe("2027-03-14");
+    expect(iso(r.lastCancellationDate)).toBe("2026-12-14");
+    expect(r.daysUntilDeadline).toBe(17);
     expect(r.status).toBe("yellow");
   });
 
-  it("Frist heute zählt noch als erreichbar (rot, 0 Tage)", () => {
-    const r = computeDeadlines(base, d("2026-10-01"));
-    expect(iso(r.lastCancellationDate)).toBe("2026-10-01");
+  it("Frist heute zählt noch (rot, 0 Tage)", () => {
+    const r = computeDeadlines(base, d("2026-09-30"));
+    expect(iso(r.lastCancellationDate)).toBe("2026-09-30");
     expect(r.daysUntilDeadline).toBe(0);
     expect(r.status).toBe("red");
   });
 
   it("Kündigungsfrist in Tagen", () => {
     const r = computeDeadlines({ ...base, noticeValue: 30, noticeUnit: "DAYS" }, d("2025-06-01"));
-    expect(iso(r.lastCancellationDate)).toBe("2026-12-02");
+    expect(iso(r.lastCancellationDate)).toBe("2026-12-01");
   });
 
-  it("Monatsende: 31. Januar + 1 Monat → 28. Februar", () => {
-    const r = computeDeadlines(
-      { ...base, startDate: d("2025-01-31"), minTermMonths: 1, noticeValue: 0, noticeUnit: "DAYS", autoRenew: false },
-      d("2025-02-01"),
-    );
-    expect(iso(r.termEnd)).toBe("2025-02-28");
+  it("Frist am Wochenende → Freitag davor", () => {
+    // Ende 28.02.2027, minus 3 Monate = Sa 28.11.2026 → Fr 27.11.2026
+    const r = computeDeadlines({ ...base, startDate: d("2025-03-01") }, d("2026-11-01"));
+    expect(iso(r.termEnd)).toBe("2027-02-28");
+    expect(iso(r.lastCancellationDate)).toBe("2026-11-27");
   });
 
-  it("Schaltjahr: 29. Februar", () => {
-    const r = computeDeadlines(
-      { ...base, startDate: d("2024-02-29"), minTermMonths: 12, noticeValue: 1, noticeUnit: "MONTHS", autoRenew: false },
-      d("2024-06-01"),
-    );
-    expect(iso(r.termEnd)).toBe("2025-02-28");
-    expect(iso(r.lastCancellationDate)).toBe("2025-01-28");
+  it("Schaltjahr: Ende 29.02.", () => {
+    const r = computeDeadlines({ ...base, startDate: d("2023-03-01"), minTermMonths: 12, autoRenew: false }, d("2023-06-01"));
+    expect(iso(r.termEnd)).toBe("2024-02-29");
+  });
+
+  it("Krankenkasse Grundversicherung: Eingang bis 30.11.", () => {
+    const kvg = { ...base, startDate: d("2026-01-01"), minTermMonths: 12, noticeValue: 1, endOfMonth: true };
+    const r = computeDeadlines(kvg, d("2026-11-27"));
+    expect(iso(r.termEnd)).toBe("2026-12-31");
+    expect(iso(r.lastCancellationDate)).toBe("2026-11-30");
+    expect(r.status).toBe("red");
+  });
+
+  it("Zusatzversicherung: Eingang bis 30.09., sonst nächstes Jahr", () => {
+    const vvg = { ...base, startDate: d("2026-01-01"), minTermMonths: 12, noticeValue: 3, endOfMonth: true };
+    expect(iso(computeDeadlines(vvg, d("2026-06-01")).lastCancellationDate)).toBe("2026-09-30");
+    expect(iso(computeDeadlines(vvg, d("2026-11-27")).lastCancellationDate)).toBe("2027-09-30");
+  });
+
+  it("Monatsfrist auf Monatsende: Ende Februar → Eingang bis 30.11.", () => {
+    const c = { ...base, startDate: d("2025-03-01"), endOfMonth: true };
+    expect(iso(computeDeadlines(c, d("2026-11-01")).lastCancellationDate)).toBe("2026-11-30");
+  });
+
+  it("Swisscom-Stil: 60 Tage auf Monatsende, danach monatlich kündbar", () => {
+    const c = { ...base, startDate: d("2025-03-15"), minTermMonths: 24, renewalMonths: 1, noticeValue: 60, noticeUnit: "DAYS" as const, endOfMonth: true };
+    const r = computeDeadlines(c, d("2026-11-27"));
+    expect(iso(r.termEnd)).toBe("2027-03-31");
+    expect(iso(r.lastCancellationDate)).toBe("2027-01-29"); // Sa 30.01. → Fr 29.01.
+    const later = computeDeadlines(c, d("2027-02-01"));
+    expect(iso(later.termEnd)).toBe("2027-04-30");
+    expect(iso(later.lastCancellationDate)).toBe("2027-03-01");
   });
 
   it("nicht verlängernder Vertrag nach Frist: endet automatisch", () => {
     const r = computeDeadlines({ ...base, autoRenew: false }, d("2026-11-01"));
     expect(r.status).toBe("ending");
-    expect(iso(r.termEnd)).toBe("2027-01-01");
+    expect(iso(r.termEnd)).toBe("2026-12-31");
   });
 
   it("nicht verlängernder Vertrag nach Laufzeitende: abgelaufen", () => {
-    const r = computeDeadlines({ ...base, autoRenew: false }, d("2027-02-01"));
-    expect(r.status).toBe("expired");
+    expect(computeDeadlines({ ...base, autoRenew: false }, d("2027-01-01")).status).toBe("expired");
   });
 
   it("gekündigter Vertrag ist grau", () => {
@@ -82,15 +110,14 @@ describe("computeDeadlines", () => {
   });
 
   it("Ampelgrenzen 14 / 60 Tage", () => {
-    expect(computeDeadlines(base, d("2026-09-17")).status).toBe("red"); // 14 Tage
-    expect(computeDeadlines(base, d("2026-09-16")).status).toBe("yellow"); // 15 Tage
-    expect(computeDeadlines(base, d("2026-08-02")).status).toBe("yellow"); // 60 Tage
-    expect(computeDeadlines(base, d("2026-08-01")).status).toBe("green"); // 61 Tage
+    expect(computeDeadlines(base, d("2026-09-16")).status).toBe("red"); // 14 Tage
+    expect(computeDeadlines(base, d("2026-09-15")).status).toBe("yellow"); // 15 Tage
+    expect(computeDeadlines(base, d("2026-08-01")).status).toBe("yellow"); // 60 Tage
+    expect(computeDeadlines(base, d("2026-07-31")).status).toBe("green"); // 61 Tage
   });
 
   it("eigene Reminder-Tage", () => {
-    const r = computeDeadlines(base, d("2025-06-01"), 10);
-    expect(iso(r.reminderDate)).toBe("2026-09-21");
+    expect(iso(computeDeadlines(base, d("2025-06-01"), 10).reminderDate)).toBe("2026-09-20");
   });
 });
 

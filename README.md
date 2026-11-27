@@ -2,7 +2,8 @@
 
 Web-App (Schweiz, CHF) zum Verwalten von Verträgen: Kündigungsfristen automatisch berechnen, Ampel-Dashboard mit
 Monats-/Jahreskosten, Kündigungsschreiben als PDF mit einem Klick, KI-Scan von Rechnungen/Policen, E-Mail-Erinnerungen
-und Freemium-Modell (Free: 3 Verträge, Pro: CHF 4.90/Mt. oder CHF 39/Jahr).
+und Freemium-Modell (Free: unbegrenzt Verträge, Erinnerungen und PDF; Pro: KI-Scan, Haushalt, Spar-Übersicht für
+CHF 4.90/Mt. oder CHF 39/Jahr). Installierbar auf dem Handy (PWA).
 
 **Stack:** Next.js 15 (App Router, Server Actions) · Prisma + SQLite · Auth.js (E-Mail/Passwort) · pdf-lib ·
 Claude API (Vision/PDF) · nodemailer · Stripe · Tailwind · Vitest
@@ -32,11 +33,20 @@ Ohne Stripe-Keys gibt es im Entwicklungsmodus auf `/pricing` den Button „Pro t
 
 ## Fristberechnung (`src/lib/deadlines.ts`)
 
-1. Laufzeitende = Vertragsbeginn + Mindestlaufzeit
+1. Vertragsende = letzter Vertragstag (Vertragsbeginn + Mindestlaufzeit − 1 Tag); mit „nur auf Monatsende“ aufs Monatsende gerundet
 2. Bei automatischer Verlängerung: so lange um die Verlängerungsdauer verschieben, bis die Frist wieder erreichbar ist
-3. Letzter Kündigungstermin = Laufzeitende − Kündigungsfrist (Tage oder Monate)
-4. Erinnerung = letzter Kündigungstermin − Reminder-Tage (Default 30, in den Einstellungen änderbar)
-5. Ampel: rot ≤ 14 Tage, gelb ≤ 60 Tage, sonst grün
+3. Eingangsfrist = Vertragsende − Kündigungsfrist (Tage oder Monate; bei Monaten + Monatsende-Regel aufs Monatsende).
+   Fällt sie auf Samstag/Sonntag, gilt der Freitag davor
+4. „Brief absenden bis“ = Eingangsfrist − 5 Arbeitstage (Feiertage werden nicht berücksichtigt)
+5. Erinnerung = Eingangsfrist − Reminder-Tage (Default 30, in den Einstellungen änderbar)
+6. Ampel: rot ≤ 14 Tage, gelb ≤ 60 Tage, sonst grün
+
+## Anbieter-Verzeichnis (`src/lib/providers.ts`)
+
+Typische Fristen und der zulässige Kündigungsweg für 12 Schweizer Anbieter bzw. Vertragsarten (Swisscom, Sunrise, Salt,
+Wingo, Yallo, Activ Fitness, PureGym, Update Fitness, SBB GA/Halbtax, Grund- und Zusatzversicherung). Quelle:
+[AboQuit.ch Kündigungsfristen-Verzeichnis](https://github.com/aboquit/schweizer-kuendigungsfristen-verzeichnis), frei
+nutzbar, Stand 1.11.2026. Postadressen sind bewusst nicht hinterlegt. Vor jeder Saison aktualisieren.
 
 ## Erinnerungen
 
@@ -62,6 +72,11 @@ Verarbeitete Events: `checkout.session.completed`, `customer.subscription.update
 npm test          # Unit- & Integrationstests (Fristlogik, Plan-Limits, Reminder, Stripe-Webhook, PDF, KI gemockt)
 npm run e2e       # Browser-Smoke-Test gegen laufenden Dev-Server (Playwright muss installiert sein)
 ```
+
+## Konto & Datenschutz
+
+- „Passwort vergessen“: Link per E-Mail, 1 Stunde gültig, einmal nutzbar (Token nur als Hash gespeichert)
+- Einstellungen → „Daten herunterladen“ (JSON) und „Konto löschen“ (inkl. hochgeladener Dateien)
 
 ## Hinweise
 

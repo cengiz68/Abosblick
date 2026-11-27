@@ -9,7 +9,8 @@ export interface CancellationLetter {
   providerAddress: string; // mehrzeilig
   customerNumber?: string | null;
   contractNumber?: string | null;
-  terminationDate: Date; // Laufzeitende, auf das gekündigt wird
+  terminationDate: Date; // letzter Vertragstag, auf den gekündigt wird
+  kind?: "default" | "kvg" | "vvg";
   place: string;
   date: Date;
 }
@@ -46,11 +47,15 @@ export function letterText(l: CancellationLetter) {
   const refs = [l.contractNumber && `Vertragsnummer ${l.contractNumber}`, l.customerNumber && `Kundennummer ${l.customerNumber}`]
     .filter(Boolean)
     .join(", ");
-  const subject = `Kündigung${refs ? ` – ${refs}` : ""}`;
+  const what = l.kind === "kvg" ? "Kündigung der Grundversicherung (KVG)" : l.kind === "vvg" ? "Kündigung der Zusatzversicherung (VVG)" : "Kündigung";
+  const subject = `${what}${refs ? ` – ${refs}` : ""}`;
   const body =
     `Sehr geehrte Damen und Herren\n\n` +
     `Hiermit kündige ich den oben genannten Vertrag fristgerecht per ${fmtDate(l.terminationDate)}, ` +
     `ersatzweise auf den nächstmöglichen Termin.\n\n` +
+    (l.kind === "kvg"
+      ? `Die Bestätigung meines neuen Versicherers über die Aufnahme in die obligatorische Krankenpflegeversicherung erhalten Sie von diesem bzw. reiche ich nach.\n\n`
+      : "") +
     `Bitte bestätigen Sie mir den Eingang dieser Kündigung sowie das Vertragsende schriftlich. ` +
     `Einer allfälligen Verlängerung oder einem Rückgewinnungsangebot per Telefon widerspreche ich.\n\n` +
     `Freundliche Grüsse`;

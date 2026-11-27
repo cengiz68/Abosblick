@@ -6,8 +6,8 @@ import { stripeEnabled } from "@/lib/stripe";
 import { PRICE_MONTHLY_LABEL, PRICE_YEARLY_LABEL } from "@/lib/constants";
 import { devUpgrade, devUpgradeAllowed } from "./actions";
 
-const FREE = ["Bis zu 3 aktive Verträge", "Automatische Fristberechnung", "Ampel-Dashboard & Kostenübersicht", "Kündigungs-PDF mit 1 Klick", "E-Mail-Erinnerung vor der Frist"];
-const PRO = ["Unlimitierte Verträge", "Foto- & PDF-Scan mit KI", "Haushalts-Ansicht für Familie / WG", "Spar-Übersicht nach Kategorie", "Alles aus Free"];
+const FREE = ["Unbegrenzt viele Verträge", "Automatische Fristberechnung inkl. Monatsende-Regel", "Schweizer Anbieter-Verzeichnis mit Kündigungsweg", "Ampel-Dashboard & Kostenübersicht", "Kündigungs-PDF mit 1 Klick", "E-Mail-Erinnerung vor der Frist", "Krankenkassen-Fristen (30.9. / 30.11.)"];
+const PRO = ["Foto- & PDF-Scan mit KI", "Haushalts-Ansicht für Familie / WG", "Spar-Übersicht nach Kategorie", "Alles aus Free"];
 
 export default async function PricingPage() {
   const session = await auth();

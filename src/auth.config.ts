@@ -1,6 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 
-const PUBLIC = ["/", "/login", "/register", "/pricing"];
+const PUBLIC = ["/", "/login", "/register", "/pricing", "/forgot-password", "/reset-password", "/manifest.webmanifest", "/sw.js"];
 
 export const authConfig = {
   pages: { signIn: "/login" },
@@ -10,7 +10,7 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request }) {
       const { pathname } = request.nextUrl;
-      if (PUBLIC.includes(pathname) || pathname.startsWith("/api/auth") || pathname.startsWith("/api/stripe/webhook") || pathname.startsWith("/api/cron")) return true;
+      if (PUBLIC.includes(pathname) || pathname.startsWith("/api/auth") || pathname.startsWith("/api/stripe/webhook") || pathname.startsWith("/api/cron") || pathname.startsWith("/icons/")) return true;
       return !!auth?.user;
     },
     jwt({ token, user }) {

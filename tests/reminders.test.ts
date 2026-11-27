@@ -10,7 +10,7 @@ describe("runReminders", () => {
 
   it("schickt genau eine Erinnerung pro Frist", async () => {
     const u = await makeUser();
-    // Laufzeitende 01.03.2027, 3 Monate Frist → letzte Frist 01.12.2026 (4 Tage), Reminder fällig
+    // Vertragsende 28.02.2027, 3 Monate Frist → Sa 28.11.2026 → Fr 27.11.2026 (heute), Reminder fällig
     await testDb.contract.create({ data: { userId: u.id, provider: "Swisscom", category: "MOBILE", monthlyPrice: 6500,
       startDate: new Date("2025-03-01T00:00:00"), minTermMonths: 24, noticeValue: 3, noticeUnit: "MONTHS", autoRenew: true } });
     // weit entfernte Frist → keine Mail
@@ -25,14 +25,16 @@ describe("runReminders", () => {
     expect((await runReminders(testDb, today, send)).sent).toBe(1);
     expect(mails[0].to).toBe("anna@example.ch");
     expect(mails[0].subject).toContain("Swisscom");
-    expect(mails[0].subject).toContain("01.12.2026");
+    expect(mails[0].subject).toContain("27.11.2026");
+    expect(mails[0].text).toContain("absenden");
     expect((await runReminders(testDb, today, send)).sent).toBe(0);
   });
 
   it("respektiert individuelle Reminder-Tage", async () => {
     const u = await makeUser("b@example.ch", { reminderDays: 2 });
     await testDb.contract.create({ data: { userId: u.id, provider: "Sunrise", category: "INTERNET", monthlyPrice: 5000,
-      startDate: new Date("2025-03-01T00:00:00"), minTermMonths: 24, noticeValue: 3, noticeUnit: "MONTHS", autoRenew: true } });
+      startDate: new Date("2025-03-01T00:00:00"), minTermMonths: 24, noticeValue: 2, noticeUnit: "MONTHS", autoRenew: true } });
+    // Frist 28.12.2026 (31 Tage) – mit 2 Reminder-Tagen noch keine Mail
     expect((await runReminders(testDb, today, async () => {})).sent).toBe(0);
   });
 });

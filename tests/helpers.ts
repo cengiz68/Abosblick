@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 export const testDb = new PrismaClient({ datasources: { db: { url: "file:./test.db" } } });
 export async function reset() {
+  await testDb.passwordResetToken.deleteMany();
   await testDb.reminderLog.deleteMany();
   await testDb.contract.deleteMany();
   await testDb.uploadedFile.deleteMany();

@@ -13,7 +13,3 @@ export async function findVisibleContract(user: User, id: string) {
   const ids = await visibleUserIds(user, true);
   return db.contract.findFirst({ where: { id, userId: { in: ids } }, include: { user: true } });
 }
-
-export async function activeContractCount(userId: string) {
-  return db.contract.count({ where: { userId, status: "ACTIVE" } });
-}

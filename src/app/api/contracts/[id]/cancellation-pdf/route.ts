@@ -22,6 +22,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     customerNumber: contract.customerNumber,
     contractNumber: contract.contractNumber,
     terminationDate: termEnd,
+    kind: contract.providerKey === "kvg" || contract.providerKey === "vvg" ? contract.providerKey : "default",
     place: owner.city || "",
     date: new Date(),
   });

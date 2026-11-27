@@ -1,12 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
+import { RegisterSW } from "@/components/RegisterSW";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Vertragsfrist – Verträge im Griff",
   description: "Kündigungsfristen berechnen, rechtzeitig erinnert werden, mit einem Klick kündigen.",
+  appleWebApp: { capable: true, title: "Vertragsfrist", statusBarStyle: "default" },
+  icons: { icon: "/icons/icon.svg", apple: "/icons/apple-touch-icon.png" },
 };
+
+export const viewport: Viewport = { themeColor: "#059669", width: "device-width", initialScale: 1 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -14,8 +19,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="de-CH">
       <body>
         <header className="border-b border-slate-200 bg-white">
-          <nav className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-sm">
-            <Link href={session ? "/dashboard" : "/"} className="mr-auto text-base font-semibold text-emerald-700">
+          <nav className="mx-auto flex max-w-5xl items-center gap-x-5 overflow-x-auto whitespace-nowrap px-4 py-3 text-sm">
+            <Link href={session ? "/dashboard" : "/"} className="mr-auto shrink-0 text-base font-semibold text-emerald-700">
               ⏱ Vertragsfrist
             </Link>
             {session ? (
@@ -39,7 +44,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </nav>
         </header>
-        <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+        <main className="mx-auto max-w-5xl px-4 py-6 sm:py-8">{children}</main>
+        <RegisterSW />
       </body>
     </html>
   );

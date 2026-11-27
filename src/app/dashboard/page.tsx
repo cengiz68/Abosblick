@@ -5,7 +5,9 @@ import { visibleUserIds } from "@/lib/access";
 import { computeDeadlines, totals } from "@/lib/deadlines";
 import { formatCHF } from "@/lib/money";
 import { fmtDate } from "@/lib/dates";
-import { CATEGORIES, FREE_CONTRACT_LIMIT, type Category } from "@/lib/constants";
+import { CATEGORIES, type Category } from "@/lib/constants";
+import { findProvider } from "@/lib/providers";
+import { ChannelNotice } from "@/components/ChannelNotice";
 import { isPro } from "@/lib/plan";
 import { StatusBadge } from "@/components/StatusBadge";
 import { setCancelled } from "../contracts/actions";
@@ -25,13 +27,12 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     .sort((a, b) => ORDER[a.d.status] - ORDER[b.d.status] || a.d.lastCancellationDate.getTime() - b.d.lastCancellationDate.getTime());
   const t = totals(contracts, today);
   const urgent = rows.filter((r) => r.d.status === "red" || r.d.status === "yellow").length;
-  const activeOwn = contracts.filter((c) => c.userId === user.id && c.status === "ACTIVE").length;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Hallo {user.name.split(" ")[0]}</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 [&>a]:whitespace-nowrap">
           {pro && user.householdId && (
             <Link href={householdView ? "/dashboard" : "/dashboard?view=household"} className="btn-secondary">
               {householdView ? "Nur meine Verträge" : "Ganzer Haushalt"}
@@ -48,11 +49,6 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <div className="card"><p className="text-sm text-slate-500">Bald fällige Fristen</p><p className={`text-2xl font-semibold ${urgent ? "text-amber-600" : ""}`}>{urgent}</p></div>
       </div>
 
-      {!pro && (
-        <p className="text-sm text-slate-500">
-          Free-Plan: {activeOwn} / {FREE_CONTRACT_LIMIT} aktive Verträge · <Link href="/pricing" className="text-emerald-700 underline">Pro freischalten</Link>
-        </p>
-      )}
 
       {rows.length === 0 ? (
         <div className="card text-center text-slate-600">
@@ -63,6 +59,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           {rows.map(({ c, d }) => {
             const own = c.userId === user.id;
             const inactive = d.status === "cancelled" || d.status === "expired";
+            const prov = findProvider(c.providerKey);
             return (
               <li key={c.id} className={`card flex flex-wrap items-center gap-4 ${inactive ? "opacity-60" : ""}`} data-testid="contract-row">
                 <div className="min-w-48 flex-1">
@@ -82,21 +79,26 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
                     <span>Endet am {fmtDate(d.termEnd)}</span>
                   ) : (
                     <>
-                      <p>Kündigen bis <strong>{fmtDate(d.lastCancellationDate)}</strong></p>
-                      <p className="text-slate-500">noch {d.daysUntilDeadline} Tage · Ende {fmtDate(d.termEnd)}</p>
+                      <p>Eintreffen bis <strong>{fmtDate(d.lastCancellationDate)}</strong> <span className="text-slate-500">(noch {d.daysUntilDeadline} Tage)</span></p>
+                      <p className="text-slate-500">Brief absenden bis {fmtDate(d.sendByDate)} · Vertragsende {fmtDate(d.termEnd)}</p>
                     </>
                   )}
                 </div>
                 {own && (
                   <div className="flex flex-wrap gap-2">
-                    {c.status === "ACTIVE" && (
+                    {c.status === "ACTIVE" && (prov?.channel === "no-letter" ? (
+                      <a href={`/api/contracts/${c.id}/cancellation-pdf`} className="btn-secondary">PDF trotzdem erstellen</a>
+                    ) : (
                       <a href={`/api/contracts/${c.id}/cancellation-pdf`} className="btn">Kündigen (PDF)</a>
-                    )}
+                    ))}
                     <form action={setCancelled.bind(null, c.id, c.status === "ACTIVE")}>
                       <button className="btn-secondary">{c.status === "ACTIVE" ? "Als gekündigt markieren" : "Reaktivieren"}</button>
                     </form>
                     <Link href={`/contracts/${c.id}/edit`} className="btn-secondary">Bearbeiten</Link>
                   </div>
+                )}
+                {prov && prov.channel !== "letter" && c.status === "ACTIVE" && (
+                  <div className="w-full"><ChannelNotice provider={prov} compact /></div>
                 )}
               </li>
             );

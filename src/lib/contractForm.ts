@@ -15,6 +15,8 @@ export interface ContractFormValues {
   noticeUnit: "DAYS" | "MONTHS";
   autoRenew: boolean;
   renewalMonths: string;
+  endOfMonth: boolean;
+  providerKey: string;
   notes: string;
   sourceFileId?: string;
 }
@@ -22,7 +24,7 @@ export interface ContractFormValues {
 export const EMPTY_CONTRACT: ContractFormValues = {
   provider: "", providerAddress: "", category: "MOBILE", customerNumber: "", contractNumber: "",
   monthlyPrice: "", startDate: "", minTermMonths: "12", noticeValue: "3", noticeUnit: "MONTHS",
-  autoRenew: true, renewalMonths: "12", notes: "",
+  autoRenew: true, renewalMonths: "12", endOfMonth: false, providerKey: "", notes: "",
 };
 
 
@@ -33,7 +35,8 @@ export function valuesFromContract(c: Contract): ContractFormValues {
     monthlyPrice: (c.monthlyPrice / 100).toFixed(2), startDate: toInputDate(c.startDate),
     minTermMonths: String(c.minTermMonths), noticeValue: String(c.noticeValue),
     noticeUnit: c.noticeUnit === "DAYS" ? "DAYS" : "MONTHS", autoRenew: c.autoRenew,
-    renewalMonths: String(c.renewalMonths), notes: c.notes ?? "",
+    renewalMonths: String(c.renewalMonths), endOfMonth: c.endOfMonth, providerKey: c.providerKey ?? "",
+    notes: c.notes ?? "",
   };
 }
 

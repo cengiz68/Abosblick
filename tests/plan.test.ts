@@ -1,17 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { isPro, canAddContract, canUse } from "@/lib/plan";
+import { isPro, canUse } from "@/lib/plan";
 import { parseCHF, formatCHF } from "@/lib/money";
 
 const now = new Date("2026-11-27T00:00:00");
 describe("plan", () => {
-  it("Free: max. 3 aktive Verträge", () => {
-    const u = { plan: "FREE", proUntil: null };
-    expect(canAddContract(u, 2, now)).toBe(true);
-    expect(canAddContract(u, 3, now)).toBe(false);
-    expect(canUse(u, "scan", now)).toBe(false);
+  it("Free: keine Pro-Features", () => {
+    expect(canUse({ plan: "FREE", proUntil: null }, "scan", now)).toBe(false);
   });
-  it("Pro: unlimitiert, solange proUntil nicht abgelaufen", () => {
-    expect(canAddContract({ plan: "PRO", proUntil: null }, 50, now)).toBe(true);
+  it("Pro gilt, solange proUntil nicht abgelaufen", () => {
+    expect(canUse({ plan: "PRO", proUntil: null }, "household", now)).toBe(true);
     expect(isPro({ plan: "PRO", proUntil: new Date("2026-12-01") }, now)).toBe(true);
     expect(isPro({ plan: "PRO", proUntil: new Date("2026-11-01") }, now)).toBe(false);
   });

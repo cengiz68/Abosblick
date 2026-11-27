@@ -25,6 +25,7 @@ model User {
   ownedHousehold       Household?     @relation("Owner")
   contracts            Contract[]
   files                UploadedFile[]
+  resetTokens          PasswordResetToken[]
   createdAt            DateTime       @default(now())
 }
 
@@ -54,6 +55,8 @@ model Contract {
   noticeUnit      String        @default("MONTHS") // DAYS | MONTHS
   autoRenew       Boolean       @default(true)
   renewalMonths   Int           @default(12)
+  endOfMonth      Boolean       @default(false) // Kündigung nur auf Monatsende möglich
+  providerKey     String? // Eintrag aus dem Anbieter-Verzeichnis (src/lib/providers.ts)
   status          String        @default("ACTIVE") // ACTIVE | CANCELLED
   cancelledAt     DateTime?
   notes           String?
@@ -83,4 +86,14 @@ model UploadedFile {
   mimeType      String
   extractedJson String?
   createdAt     DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 }

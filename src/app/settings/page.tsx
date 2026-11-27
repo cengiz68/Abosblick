@@ -4,6 +4,7 @@ import { isPro } from "@/lib/plan";
 import { fmtDate } from "@/lib/dates";
 import { stripeEnabled } from "@/lib/stripe";
 import { SettingsForm } from "./SettingsForm";
+import { DeleteAccount } from "./DeleteAccount";
 
 export default async function SettingsPage() {
   const user = await requireUser();
@@ -20,6 +21,14 @@ export default async function SettingsPage() {
         ) : !pro ? (
           <Link href="/pricing" className="btn">Auf Pro upgraden</Link>
         ) : null}
+      </div>
+      <div className="card space-y-3 text-sm">
+        <h2 className="font-semibold">Meine Daten</h2>
+        <p className="text-slate-600">Lade alle über dich gespeicherten Daten herunter oder lösche dein Konto vollständig.</p>
+        <div className="flex flex-wrap gap-2">
+          <a href="/api/account/export" className="btn-secondary">Daten herunterladen (JSON)</a>
+          <DeleteAccount />
+        </div>
       </div>
     </div>
   );

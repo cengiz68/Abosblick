@@ -8,10 +8,8 @@ import { requireUser } from "@/lib/session";
 import { CATEGORY_KEYS } from "@/lib/constants";
 import { parseCHF } from "@/lib/money";
 import { parseInputDate } from "@/lib/dates";
-import { canAddContract } from "@/lib/plan";
-import { activeContractCount } from "@/lib/access";
 
-export type ContractFormState = { error?: string; limitReached?: boolean } | undefined;
+export type ContractFormState = { error?: string } | undefined;
 
 const ContractSchema = z.object({
   provider: z.string().trim().min(1, "Anbieter fehlt."),
@@ -30,6 +28,8 @@ const ContractSchema = z.object({
   noticeUnit: z.enum(["DAYS", "MONTHS"]),
   autoRenew: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
   renewalMonths: z.coerce.number().int().min(1).max(120).default(12),
+  endOfMonth: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
+  providerKey: z.string().optional(),
   notes: z.string().trim().optional(),
   sourceFileId: z.string().optional(),
 });
@@ -46,14 +46,13 @@ function parse(form: FormData) {
       contractNumber: d.contractNumber || null,
       notes: d.notes || null,
       sourceFileId: d.sourceFileId || null,
+      providerKey: d.providerKey || null,
     },
   } as const;
 }
 
 export async function createContract(_: ContractFormState, form: FormData): Promise<ContractFormState> {
   const user = await requireUser();
-  if (!canAddContract(user, await activeContractCount(user.id)))
-    return { error: "Im Free-Plan sind maximal 3 aktive Verträge möglich.", limitReached: true };
   const r = parse(form);
   if ("error" in r) return { error: r.error };
   await db.contract.create({ data: { ...r.data, userId: user.id } });

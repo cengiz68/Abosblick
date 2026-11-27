@@ -4,6 +4,9 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
+import bcrypt from "bcryptjs";
+import { signOut } from "@/auth";
+import { deleteUserAccount } from "@/lib/account";
 
 export type SettingsState = { error?: string; ok?: boolean } | undefined;
 
@@ -22,4 +25,14 @@ export async function saveSettings(_: SettingsState, form: FormData): Promise<Se
   await db.user.update({ where: { id: user.id }, data: parsed.data });
   revalidatePath("/settings");
   return { ok: true };
+}
+
+export type DeleteState = { error?: string } | undefined;
+
+export async function deleteAccountAction(_: DeleteState, form: FormData): Promise<DeleteState> {
+  const user = await requireUser();
+  if (String(form.get("confirm") ?? "") !== "LÖSCHEN") return { error: "Bitte zur Bestätigung LÖSCHEN eintippen." };
+  if (!(await bcrypt.compare(String(form.get("password") ?? ""), user.passwordHash))) return { error: "Passwort ist falsch." };
+  await deleteUserAccount(db, user.id);
+  await signOut({ redirectTo: "/?deleted=1" });
 }
